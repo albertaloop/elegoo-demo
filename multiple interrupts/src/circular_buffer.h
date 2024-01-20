@@ -8,6 +8,7 @@ struct circular_buffer_t {
     int values[BUFFER_LEN];
     unsigned int write_ptr = 0;
     unsigned int read_ptr = 0;
+    int count = 0;
 } ;
 typedef circular_buffer_t circular_buffer;
 
