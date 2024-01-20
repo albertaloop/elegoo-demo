@@ -12,23 +12,21 @@
 #define STOP    2
 #define REVERSE 3
 
-#define SMCR_POWER_SAVE (1 << SM1) | (1 << SM0)
-
-#define PROX_INPUT  7
+#define PROXIMITY_INPUT  7
 
 bool timer_ready = false;
 int state = TASK1;
 int motor_state = 2;
 int next_motor_state = 2;
 
-int receiver = 11; // Signal Pin of IR receiver to Arduino Digital Pin 11
 
 // Motor 1
 int dir1PinA = 2;
 int dir2PinA = 3;
-
 int speedPinA = 10; // Needs to be a PWM pin to be able to control motor speed
 
+// IR Receiver
+int receiver = 11; // Signal Pin of IR receiver to Arduino Digital Pin 11
 IRrecv irrecv(receiver);     // create instance of 'irrecv'
 decode_results results;      // create instance of 'decode_results'
 unsigned long key_value = 0;
@@ -51,7 +49,13 @@ void init_timer()
 
 void init_power_save()
 {
-  SMCR |= SMCR_POWER_SAVE;
+  SMCR |= (1 << SM1) | (1 << SM0);
+  SMCR |= (1 << SE);
+}
+
+void init_idle()
+{
+  SMCR &= ~(1 << SM2) & ~(1 << SM1) & ~(1 << SM0);
   SMCR |= (1 << SE);
 }
 
@@ -59,9 +63,6 @@ void translateIR() // takes action based on IR code received
 
 // describing Remote IR codes 
 {
-
-  // if (results.value == 0XFFFFFFFF)
-  // results.value = key_value;
   switch(results.value)
 
   {
@@ -111,7 +112,7 @@ void translateIR() // takes action based on IR code received
     Serial.println(" other button   ");
 
   }// End Case
-        key_value = results.value;
+  key_value = results.value;
   // delay(500); // Do not get immediate repeat
 
 
@@ -145,8 +146,9 @@ void motor_stop()
 
 
 
-void task1_func()
+void task1()
 {
+  Serial.println("Task 1");
   if (irrecv.decode(&results)) // have we received an IR signal?
   {
     irrecv.resume(); // receive the next value
@@ -154,14 +156,16 @@ void task1_func()
   }  
 }
 
-void task2_func()
+void task2()
 {
+  Serial.println("Task 2");
   int sensorValue = digitalRead(7);
   Serial.println(sensorValue);
 }
 
-void task3_func()
+void task3()
 {
+  Serial.println("Task 3");
   switch(motor_state)
   {
     case FORWARD:
@@ -191,7 +195,7 @@ void setup() {
   pinMode(dir2PinA,OUTPUT);
   pinMode(speedPinA,OUTPUT);
   // Proximity
-  pinMode(7, INPUT);
+  pinMode(PROXIMITY_INPUT, INPUT);
 
   
 
@@ -203,14 +207,15 @@ void setup() {
   init_power_save();
   Serial.begin(115200);
 
-
-
 }
 
 
-  int count = 0;
-
-
+void atmega_sleep()
+{
+  sleep_enable();
+  sleep_cpu();
+  sleep_disable();
+}
 
 void loop() {
 
@@ -221,20 +226,16 @@ void loop() {
     switch(state)
     {
       case TASK1: 
-        Serial.println("task1");
-        task1_func();
+        task1();
       break;
       case TASK2:
-        Serial.println("task2");
-        task2_func();
+        task2();
       break;
       case TASK3:
-        Serial.println("task1 again");
-        task1_func();
+        task1();
       break;
       case TASK4:
-        Serial.println("task3 again");
-        task3_func();
+        task3();
       break;
       default: break;
     }
@@ -242,19 +243,11 @@ void loop() {
 
     if(state%(NUM_STATES) == 0) state = TASK1;
     timer_ready = false;
-    count++;
-    if(count == 5) 
-    {
-      Serial.println("timer went off");
-      count = 0;
-    }
   }
-  // sleep_enable();
-  // sleep_cpu();
-  // sleep_disable();
+
 }
 
-// timer1 overflow
+// timer1
 ISR(TIMER1_COMPA_vect) {
 // process the timer1 overflow here
   timer_ready = true;
